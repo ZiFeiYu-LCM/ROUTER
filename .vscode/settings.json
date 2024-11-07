@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "tojson.h": "c",
+        "s2j.h": "c",
+        "string": "c",
+        "typeinfo": "c",
+        "algorithm": "c"
+    }
+}

@@ -945,27 +945,40 @@ int jsonToPollinfo(char *jsonStr,pollinfo **data){
 	return arraySize;
 }
 
+
+int jsonTostr(char *jsonStr,char **str){//这里是将字符直接赋值给paraData的dataArray，
+	*str = (char*)malloc((strlen(jsonStr)+1)*sizeof(char));
+	strcpy(*str,jsonStr);
+	return 1;
+}
+
+char *strToJson(char* str,int size){
+	return str;
+}
+
+
+
+
 int jsonToParam(char *jsonStr, paraData **data){
 	printf("debug 4.1.1\n");
 	if(jsonStr==NULL || strcmp(jsonStr,"")==0){
 		return -1;
 	}
+	printf("debug 4.1--1\n");
 	cJSON *json = cJSON_Parse(jsonStr);
 	if(*data==NULL){
 		*data = paramInit(NULL,0,0);
 	}
-	//*data = (paraData*)malloc(sizeof(paraData));
+	printf("debug 4.1.1--2\n");
 	cJSON *msg = cJSON_GetObjectItemCaseSensitive(json,"msg");
 	printf("debug 4.1.2\n");
 	if(cJSON_IsString(msg)){
-		printf("debug 4.1.2.0\n");
 		char *tmp = cJSON_Print(msg);
-		printf("debug 4.1.2.1\n");
 		(*data)->msg = (char*)malloc(sizeof(char)*strlen(tmp) + 2);
-		printf("debug 4.1.2.2\n");
 		free(tmp);
-		printf("debug 4.1.2.3\n");
 		strcpy((*data)->msg,msg->valuestring);
+	}else{
+		(*data)->msg = NULL;
 	}
 	printf("debug 4.1.3\n");
 	cJSON *dataArrySize = cJSON_GetObjectItemCaseSensitive(json,"dataArrySize");
@@ -981,24 +994,26 @@ int jsonToParam(char *jsonStr, paraData **data){
 	char *data_string = cJSON_Print(dataArray);
 	printf("data_string : %s\n",data_string);
 	int mapLen = sizeof(functionMap)/sizeof(functionMap[0]),arraySize=0;
-	if(data_string != NULL){
-		for(int i=0;i<mapLen;i++){//有发送的是有结构体
-			if(strcmp(functionMap[i].key,(*data)->msg)==0){
-				printf("key = %s   msg=%s\n",functionMap[i].key,(*data)->msg);
-				arraySize = functionMap[i].toStruct(data_string,(void**)&((*data)->dataArray));
-				break;
+	if(data_string != NULL && strncmp(data_string,"null",4)!=0 && strcmp(data_string,"")!=0){//dataArray不为空
+		// printf("data_string不等于NULL ： %s\n",data_string);
+		if(cJSON_IsArray(dataArray)){//当dataArray是一个json数组时，此时需要将其转为结构体
+			for(int i=0;i<mapLen;i++){//有发送的是有结构体
+				if(strcmp(functionMap[i].key,(*data)->msg)==0){
+					printf("key = %s   msg=%s\n",functionMap[i].key,(*data)->msg);
+					arraySize = functionMap[i].toStruct(data_string,(void**)&((*data)->dataArray));
+					break;
+				}
 			}
-		}
-		if(arraySize==0){//若arraySize=0说明没有找到对应的json转结构体的函数，则dataArray可能为NULL或者一个字符串
-			if(strcmp(data_string,"")!=0  &&  strcmp(data_string,"[]")!=0){//因为dataArray初始化为NULL，所以这里只考虑data_string为字符串的情况
-				int tmpLen = strlen(data_string)+1;
-				(*data)->dataArray = (char*)malloc(sizeof(char)*tmpLen);
-				strncpy((*data)->dataArray,data_string,tmpLen);
-				arraySize = 1;
-			}
+		}else{//当dataArray不是是一个json数组时，则是字符串
+			int tmpLen = strlen(data_string)+1;
+			(*data)->dataArray = (char*)malloc(sizeof(char)*tmpLen);
+			strncpy((*data)->dataArray,dataArray->valuestring,tmpLen);
+			arraySize = 1;
 		}
 		(*data)->dataArrySize = arraySize;
 		free(data_string);
+	}else{//dataArray为空，dataArray赋值为NULL
+		(*data)->dataArray = NULL;
 	}
 	
 	cJSON_Delete(json);
@@ -1018,27 +1033,22 @@ char* paramToJson(paraData *data){
 	
 	//dataArray有三种情况，NULL，字符串，一个有对应json转结构体函数得值
 	int mapLen = sizeof(functionMap)/sizeof(functionMap[0]);
-	char isStrFlag = 1;
-	for(int i=0;i<mapLen;i++){//返回的是一个结构体  有对应json转结构体函数得值
-		if(data->msg==NULL)
-			break;
-		if(strcmp(functionMap[i].key,data->msg)==0){
-			char *tmpStr = functionMap[i].toJson((void*)data->dataArray,data->dataArrySize);
-			cJSON *dataArray = cJSON_Parse(tmpStr);
-			cJSON_AddItemToObject(json,"dataArray",dataArray);
-			free(tmpStr);
-			isStrFlag = 0;
-			break;
+
+	//当想发送字符串的时候，要把dataArrySize赋值为0.不然会优先进入结构体转json中
+	if(!(data->msg==NULL || data->dataArrySize<=0)){
+		for(int i=0;i<mapLen;i++){//返回的是一个结构体  有对应json转结构体函数得值
+			if(strcmp(functionMap[i].key,data->msg)==0){
+				char *tmpStr = functionMap[i].toJson((void*)data->dataArray,data->dataArrySize);
+				cJSON *dataArray = cJSON_Parse(tmpStr);
+				cJSON_AddItemToObject(json,"dataArray",dataArray);
+				free(tmpStr);
+				break;
+			}
 		}
-		
-	}
-	if(data->dataArray==NULL){//返回的值为NULL
+	}else if(data->dataArray==NULL){//返回的值为NULL
 		cJSON_AddStringToObject(json,"dataArray","");
-	}else if(isStrFlag){//返回的是一个字符串
-	
+	}else{//返回的是一个字符串
 		char *tmpStr = strToJson((void*)data->dataArray,data->dataArrySize);
-//		printf("tmpStr:%s\n",tmpStr);
-		//cJSON *dataArray = cJSON_Parse(tmpStr);
 		cJSON_AddStringToObject(json,"dataArray",tmpStr);
 		//free(tmpStr);//当data->dataArray时字符串的时候，tmpStr指向data->dataArray，如果这时执行了free(tmpStr)，那data->dataArray将被free，再执行paramFree会报错double free
 	}
@@ -1049,13 +1059,14 @@ char* paramToJson(paraData *data){
 }
 
 void paramFree(paraData *data){
-	if(data->dataArray != NULL)
-		free(data->dataArray);
-	if(data->msg != NULL)
-		free(data->msg);
-	if(data != NULL)
+	if(data!=NULL){
+		if(data->dataArray != NULL)
+			free(data->dataArray);
+		if(data->msg != NULL)
+			free(data->msg);
 		free(data);
-	data = NULL;
+		data = NULL;
+	}
 }
 
 paraData* paramInit(char *topic,int dataArrySize,int code){
@@ -1073,15 +1084,167 @@ paraData* paramInit(char *topic,int dataArrySize,int code){
 	return data;
 }
 
-int jsonTostr(char *jsonStr,char **str){//这里是将字符直接赋值给paraData的dataArray，
-	*str = (char*)malloc((strlen(jsonStr)+1)*sizeof(char));
-	strcpy(*str,jsonStr);
-	return 1;
+
+
+
+/**web 服务的json转换    */
+
+int jsonToDev_info_brief(char *jsonStr,struct dev_info_brief **data){
+	if(jsonStr == NULL){
+		return 0;
+	}
+	//s2j_create_struct_obj(dev_info_brief,Student);
+	cJSON *parsedJson= cJSON_Parse(jsonStr);
+	cJSON *json_temp;//因为s2j_create_struct_obj定义了json_temp，我没使用s2j_create_struct_obj，所以要自己定义
+	int jsonArraySize = cJSON_GetArraySize(parsedJson);
+	*data = (struct dev_info_brief*)malloc(sizeof(struct dev_info_brief)*jsonArraySize);
+	for(int i=0;i<jsonArraySize;i++){
+		cJSON *jsonItem = cJSON_GetArrayItem(parsedJson, i);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,devid);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,devname);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,ip);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,note);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,protocol);
+	}
+	
+	cJSON_Delete(parsedJson);
+	return jsonArraySize;
 }
 
-char *strToJson(char* str,int size){
+char* dev_info_briefToJson(struct dev_info_brief* data,int size){
+	if(data == NULL || size == 0){
+			return NULL;
+	}
+
+	cJSON *json_array = cJSON_CreateArray();
+	for(int i=0;i<size;i++){
+			s2j_create_json_obj(json_struct);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, devid);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, devname);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, ip);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, note);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, protocol);
+			cJSON_AddItemToArray(json_array, json_struct);
+	}
+	
+	char *str = cJSON_Print(json_array);
+	cJSON_Delete(json_array);
+	printf("str = %s\n",str);
 	return str;
 }
+
+int jsonToMp_info_brief(char *jsonStr,struct mp_info_brief **data){
+	if(jsonStr == NULL){
+		return 0;
+	}
+	//s2j_create_struct_obj(dev_info_brief,Student);
+	cJSON *parsedJson= cJSON_Parse(jsonStr);
+	cJSON *json_temp;//因为s2j_create_struct_obj定义了json_temp，我没使用s2j_create_struct_obj，所以要自己定义
+	int jsonArraySize = cJSON_GetArraySize(parsedJson);
+	*data = (struct mp_info_brief*)malloc(sizeof(struct mp_info_brief)*jsonArraySize);
+	for(int i=0;i<jsonArraySize;i++){
+		cJSON *jsonItem = cJSON_GetArrayItem(parsedJson, i);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,devid);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,mpid);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,groupid);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,valuetype);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,mode);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,dbindex);
+
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,addresstype);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,mpname);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,groupname);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,time);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,address);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,mpnote);
+	}
+	
+	cJSON_Delete(parsedJson);
+	return jsonArraySize;
+
+}
+
+char* mp_info_briefToJson(struct mp_info_brief* data,int size){
+	if(data == NULL || size == 0){
+			return NULL;
+	}
+
+	cJSON *json_array = cJSON_CreateArray();
+	for(int i=0;i<size;i++){
+			s2j_create_json_obj(json_struct);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, devid);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, mpid);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, groupid);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, valuetype);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, mode);
+			s2j_json_set_basic_element(json_struct,&(data[i]),int, dbindex);
+			
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, addresstype);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, mpname);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, groupname);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, time);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, address);
+			s2j_json_set_basic_element(json_struct,&(data[i]),string, mpnote);
+			cJSON_AddItemToArray(json_array, json_struct);
+	}
+	
+	char *str = cJSON_Print(json_array);
+	cJSON_Delete(json_array);
+	return str;
+}
+
+int jsonToMpinfo(char *jsonStr,struct mpinfo **data){
+	if(jsonStr == NULL){
+		return 0;
+	}
+
+	cJSON *parseJson = cJSON_Parse(jsonStr);
+	cJSON *json_temp;
+	int jsonArraySize = cJSON_GetArraySize(parseJson);
+	*data = (struct mpinfo*)malloc(sizeof(struct mpinfo)*jsonArraySize);
+	for(int i=0;i<jsonArraySize;i++){
+
+		cJSON *jsonItem = cJSON_GetArrayItem(parseJson,i);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,mpname);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,addresstype);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,dbindex);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,address);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,valuetype);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,mode);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,string,mpnote);
+		s2j_struct_get_basic_element(&((*data)[i]),jsonItem,int,devid);
+	}
+	cJSON_Delete(parseJson);
+	printf("jsonToMpinfo over\n");
+	return jsonArraySize;
+}
+
+char* mpinfoToJson(struct mpinfo* data,int size){
+	if(data == NULL || size == 0){
+			return NULL;
+	}
+	cJSON *json_array = cJSON_CreateArray();
+	for(int i=0;i<size;i++){
+		s2j_create_json_obj(json_struct);
+		s2j_json_set_basic_element(json_struct,&(data[i]),int, dbindex);
+		s2j_json_set_basic_element(json_struct,&(data[i]),int, valuetype);
+		s2j_json_set_basic_element(json_struct,&(data[i]),int, mode);
+		s2j_json_set_basic_element(json_struct,&(data[i]),int, devid);
+
+		s2j_json_set_basic_element(json_struct,&(data[i]),string, mpname);
+		s2j_json_set_basic_element(json_struct,&(data[i]),string, addresstype);
+		s2j_json_set_basic_element(json_struct,&(data[i]),string, address);
+		s2j_json_set_basic_element(json_struct,&(data[i]),string, mpnote);
+		cJSON_AddItemToArray(json_array, json_struct);
+	}
+	
+	char *str = cJSON_Print(json_array);
+	cJSON_Delete(json_array);
+	return str;
+}
+
+
+/**web 服务的json转换  end  */
 
 /*
 int main(){

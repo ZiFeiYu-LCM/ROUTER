@@ -19,6 +19,7 @@
 #include "lcm/test.h"
 #include "net/firewall.h"
 #include "tojson.h"
+#include "web/webdatabase.h"
 //#include "net/request.h"
 
 

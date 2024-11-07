@@ -6,6 +6,9 @@
 #include <cjson/cJSON.h>
 #include <pthread.h>
 #include <signal.h>
+
+#include "s2j/s2j.h"
+
 #define LOG_ERROR(msg) fprintf(stderr, "Error: In file %s, line %d, function %s, %s\n", __FILE__, __LINE__, __FUNCTION__, msg)
 #define REQUEST_ERROR(code, msg) "error:" #code "#" msg " in " __FILE__"!\n"
 
@@ -166,6 +169,8 @@ typedef struct _routeInfo{
 	char proto[50];
 }routeInfo;
 
+
+
 typedef struct _paraData{
 	void* dataArray;
 	char* msg;
@@ -173,13 +178,22 @@ typedef struct _paraData{
 	int code;
 }paraData;
 
+
 typedef int (*jsonToStruct)(char *jsonStr,void **data);
 typedef char* (*structTojson)(void* data,int size);
-typedef struct {
+struct functionTable{
 	char *key;
     jsonToStruct toStruct;
 	structTojson toJson;
-} functionTable;
+};
+
+int jsonToParam(char *jsonStr,paraData **data);
+char* paramToJson(paraData *data);
+
+
+void paramFree(paraData *data);
+paraData* paramInit(char *topic,int dataArrySize,int code);
+
 
 typedef char* (*funcPtr)(void *data);
 typedef struct {
@@ -216,20 +230,64 @@ char* dhcpinfoToJson(dhcpinfo* data,int size);
 char* routeinfoToJson(routeInfo* data,int size);
 
 
-
-int jsonToParam(char *jsonStr,paraData **data);
-char* paramToJson(paraData *data);
-
-
-void paramFree(paraData *data);
-paraData* paramInit(char *topic,int dataArrySize,int code);
-
 //将一个字符串的参数直接赋值到paraData的dataArray中
 int jsonTostr(char *jsonStr,char **str);
 char *strToJson(char* str,int size);
 
 
-static functionTable functionMap[] = {
+/**web  服务的结构体 */
+struct dev_info_brief {
+	int devid;
+	char devname[20];
+	char ip[20];
+	char note[50];
+	char protocol[20];
+};
+int jsonToDev_info_brief(char *jsonStr,struct dev_info_brief **data);
+char* dev_info_briefToJson(struct dev_info_brief* data,int size);
+
+
+struct mp_info_brief {
+	int devid;
+	int mpid;
+	int groupid;
+	char mpname[30];
+	char groupname[30];
+	char time[30];
+	int valuetype;
+	char address[30];
+	char mpnote[50];
+
+	char addresstype[20];
+	int mode;
+	int dbindex;
+	char value[20];
+};
+int jsonToMp_info_brief(char *jsonStr,struct mp_info_brief **data);
+char* mp_info_briefToJson(struct mp_info_brief* data,int size);
+
+
+
+struct mpinfo {
+	char mpname[30];
+	char addresstype[10];
+	int dbindex;
+	char address[20];
+	int valuetype;
+	int mode;
+	char mpnote[100];
+	int devid;
+};
+int jsonToMpinfo(char *jsonStr,struct mpinfo **data);
+char* mpinfoToJson(struct mpinfo* data,int size);
+
+/**web  服务的结构体  end*/
+
+
+
+
+
+static struct functionTable functionMap[] = {
     {"plc/getmpinfo", (jsonToStruct)jsonToPollinfo,(structTojson)pollinfoToJson},
 	{"plc/getmpinfo/update", (jsonToStruct)jsonToPollinfo,(structTojson)pollinfoToJson},
 	{"plc/getmpinfo/delete", (jsonToStruct)jsonToPollinfo,(structTojson)pollinfoToJson},
@@ -256,8 +314,16 @@ static functionTable functionMap[] = {
 	{"time/getsntpinfo", (jsonToStruct)jsonToNtpinfo,(structTojson)ntpinfoToJson},
 	
 	{"getstr", (jsonToStruct)jsonTostr,(structTojson)strToJson},//如果参数里返回是一个字符串的话，msg就都用getsrt
+	
+	
+	/*web 的结构体和json互转    */
+	{"web/pull_dev_info", (jsonToStruct)jsonToDev_info_brief,(structTojson)dev_info_briefToJson},
+	{"web/pull_mp_info", (jsonToStruct)jsonToMp_info_brief,(structTojson)mp_info_briefToJson},
+	// {"web/add_mp_info", (jsonToStruct)jsonToMpinfo,(structTojson)mpinfoToJson},
+	{"web/add_mp_info", (jsonToStruct)jsonToMp_info_brief,(structTojson)mp_info_briefToJson},
+	{"web/update_mp_info", (jsonToStruct)jsonToMp_info_brief,(structTojson)mp_info_briefToJson},
+	/*web 的结构体和json互转 end*/
 };
-
 
 #endif
 

@@ -1,10 +1,10 @@
 #ifndef CMDS_H
 #define CMDS_H
 #include "threadpool.h"
-
 #include "tojson.h"
 #include "mqtt.h"
-
+char exitFlag = 1;//主程序退出标志，分为3部，1是开启本地http，2是关闭http，最后是退出
+/*
 #define true 1
 #define false 0
 #define EXITSER 999
@@ -44,7 +44,7 @@ char exitFlag = 1;//主程序退出标志，分为3部，1是开启本地http，
 paraData *paramData=NULL;
 threadpool_t *thp;//线程池，用来添加任务
 
-/*
+
 char *runcmd(int cmdValue,paraData *data){
 	switch(cmdValue){
 		case 999:

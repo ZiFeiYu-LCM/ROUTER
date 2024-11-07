@@ -1,5 +1,6 @@
 #include "firewall.h"
-//这里注意，iptables添加修改防火墙规则，默认是保存到内存，开机后没有了，所以要使用iptables-save > /etc/firewall保存，开机时候使用iptables-restore < /etc/firewall恢复配置
+//这里注意，iptables添加修改防火墙规则，默认是保存到内存，开机后没有了，所以要使用iptables-save > /etc/firewall保存，
+//开机时候使用iptables-restore < /etc/firewall恢复配置
 
 void *addFirewallRule(void* arg){
 	printf("debug 4.1\n");

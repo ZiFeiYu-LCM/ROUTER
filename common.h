@@ -6,6 +6,9 @@
 #define MAXLENGTH 1024
 #define OLD_CONFIG_PATH(x) #x".old"
 
+
+
+
 #define DEVICEFILE "/etc/plc/devlist"
 #define FILEDIR "/etc/plc/"
 #define WARNFILE "etc/sy//warn"
@@ -13,9 +16,9 @@
 
 //启始配置文件
 #define LOGPATH "etc/sy/log/"
+
 //#define CONFPATH "etc/sy/syrouter.conf"
-#define CONFPATH "/home/lcm/Desktop/myfiles/router/pro/syrouter.conf"
-//devname_mpname_warnname.log
+#define CONFPATH "/home/lcm/Desktop/workspace/router/syrouter.conf"
 
 //dhcp
 #define DHCP_CONF_PATH "/etc/dnsmasq.conf"
@@ -28,6 +31,9 @@
 //#define NTP_PATH "/home/lcm/Desktop/log/ntp.conf"
 //#define OLD_CONFIG_PATH(x) "/home/lcm/Desktop/log/ntp.conf.old"
 #define SNTP_PATH "/etc/init.d/ntpdate"
+
+
+
 
 
 

@@ -3,6 +3,7 @@
 
 
 int main(){
+	//读取配置文件
 	if(readConf()!=0){
 		LOG_ERROR("readConf error");
 		return -1;

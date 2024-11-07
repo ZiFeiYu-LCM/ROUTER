@@ -4,49 +4,60 @@ int mqtt_Stop_Flag = 1;
 //funcPtr runCmd;
 char *mainExitFlag = NULL;//主程序退出标志
 LookupTable lookupTable[] = {
-	{"time/gettime",getDate},//获取时间
-	{"time/settime",setDate},//获取时间
-	{"time/setTimezone",setTimezone},
+	{"time/gettime",getDate},					//获取时间
+	{"time/settime",setDate},					//获取时间
+	{"time/setTimezone",setTimezone},			//时区域
 
-	{"net/setipinfo",setIpAddr},
-	{"net/getipinfo",get_ip_address},
-	{"net/startssh",startssh}, 
-	{"net/stopssh",stopssh},	  
-	{"net/setssh",setssh},	  
+	{"net/setipinfo",setIpAddr}, 				//设置IP地址
+	{"net/getipinfo",get_ip_address},			//获取IP地址
+	{"net/startssh",startssh}, 					//开启ssh
+	{"net/stopssh",stopssh},	  				//关闭ssh
+	{"net/setssh",setssh},	  					//设置ssh
 
-	{"time/startntp",startNTP},//获取时间
-	{"time/stopntp",stopNTP},
-	{"time/getntpinfo",getNTPinfo},
-	{"time/setntpinfo",setNTPinfo},
-	{"time/delntpserver",delNTPServer},
+	{"time/startntp",startNTP},					//开启时间服务器
+	{"time/stopntp",stopNTP},					//关闭时间服务器
+	{"time/getntpinfo",getNTPinfo},				//获取时间服务器
+	{"time/setntpinfo",setNTPinfo},				//设置时间服务器
+	{"time/delntpserver",delNTPServer},			//删除时间服务器
 
-	{"dhcp/setdhcpinfo",setiprange},
-	{"dhcp/dhcpstart",dhcpstart},
-	{"dhcp/dhcpstop",dhcpstop},
-	{"dhcp/getdhcpinfo",getdhcpinfo},
+	{"dhcp/setdhcpinfo",setiprange},			//设置dhcp信息
+	{"dhcp/dhcpstart",dhcpstart},				//开启dhcp
+	{"dhcp/dhcpstop",dhcpstop},					//关闭dhcp
+	{"dhcp/getdhcpinfo",getdhcpinfo},			//获取dhcp信息
 
 //	{"router/showrouter",routeShow}
-	{"router/showhost",hostShow},
+	{"router/showhost",hostShow},				//显示局域网内主机
 //	{"router/showstaticrouter",staticRouteShow}
 //	{"router/addstaticrouter",addStaticRoute}
 
-	{"net/addFireRule",addFirewallRule},
-	{"net/getFireRule",getFirewallRule},
-	{"net/delFireRule",delFirewallRule},
+	{"net/addFireRule",addFirewallRule},		//添加防火墙规则
+	{"net/getFireRule",getFirewallRule},		//获取防火墙规则
+	{"net/delFireRule",delFirewallRule},		//删除防火墙规则
 
-	{"plc/getmpinfo",getMpinfoList},//获取plc信息
-	{"plc/getmpinfo/update",getMpinfoList_update},
-	{"plc/getmpinfo/delete",getMpinfoList_delete},
-	{"plc/getmpinfo/add",getMpinfoList_add},
-	{"plc/putmpinfo",putMpinfoList},//将plc信息返回web
-	{"plc/pollmp",pollmp},
+	{"plc/getmpinfo",getMpinfoList},				//获取plc信息
+	{"plc/getmpinfo/update",getMpinfoList_update},	//更新本地的站点信息
+	{"plc/getmpinfo/delete",getMpinfoList_delete},	//删除本地的站点信息
+	{"plc/getmpinfo/add",getMpinfoList_add},		//获取站点信息
+	{"plc/putmpinfo",putMpinfoList},				//将站点信息返回到前端
+	{"plc/pollmp",pollmp},							//开始站点检测
 	//{"plc/writedata",writeData},
-	{"plc/pollstop",pollStop},
-	{"plc/clean",freeList},
+	{"plc/pollstop",pollStop},						//停止站点检测
+	{"plc/clean",freeList},							//释放本地站点
 	
-	{"exit",mqtt_stop},
+	{"exit",mqtt_stop},								//退出
+	
+	
+/********************** web **********************/
+	{"web/pull_dev_info",web_pull_plcinfo},
+	{"web/pull_dev_info_allnum",web_pull_plcinfo_num},
+	{"web/pull_mp_info",web_pull_mpinfo},
+	{"web/pull_mp_info_allnum",web_pull_mpinfo_num},
+	{"web/add_mp_info",web_add_mpinfo},
+	{"web/update_mp_info",web_update_mpinfo},
+/********************** web  end**********************/
 };
 
+//读取配置文件
 int readConf(){
 	FILE *fp = fopen(CONFPATH,"r");
 	if(fp==NULL){
@@ -75,8 +86,8 @@ int readConf(){
 	
 	int size = sizeof(lookupTable)/sizeof(lookupTable[0]);
 	for(int i=0;i<size;i++){
-		char tmpkey[50];
-		strncpy(tmpkey,lookupTable[i].key,60);
+		char tmpkey[51];
+		strncpy(tmpkey,lookupTable[i].key,50);
 		snprintf(lookupTable[i].key,100,"%s/%s",clientID,tmpkey);
 	}
 	
@@ -94,16 +105,15 @@ void mqtt_send_error(char* res,char *topic){
 	}
 }
 
+//MQTT接收到消息后的线程处理了函数
 void* deal(void *param){
 	thParam *param_data = (thParam*)param;
 	printf("msg:%s  topic:%s  len=%d\n",param_data->jsonStr,param_data->topic,param_data->len);
-	
-	//mqtt_send_file("/home/lcm/Desktop/ntp.conf","test/file/response");
-	//return NULL;
-	
+
 	char *tmpStr = NULL;
 	if(param_data->len > 0){
-		tmpStr = (char*)malloc(param_data->len+1);
+		tmpStr = (char*)malloc((param_data->len+1)*sizeof(char));
+		memset(tmpStr,param_data->len+1,0);
 		strcpy(tmpStr,param_data->jsonStr);
 	}
 	int size = sizeof(lookupTable)/sizeof(lookupTable[0]);
@@ -127,10 +137,7 @@ void* deal(void *param){
 		data = paramInit(NULL,0,200);
 		res = paramToJson(data);
 	}else if(strncmp(res,"error:",strlen("error:"))==0){//表示返回错误
-		//发生错误
-		
-		//data = paramInit(NULL,1,-200);
-		data = paramInit("error",1,-200);
+		data = paramInit("error",0,-200);
 		data->dataArray = malloc( sizeof(char)*(strlen(res)+1));
 		strcpy(data->dataArray,res);
 		res = paramToJson(data);
@@ -139,8 +146,11 @@ void* deal(void *param){
 	//返回数据 返回的数据会在原有的topic后加一个/response
 	char tmp_topic[100];
 	snprintf(tmp_topic,100,"%s/response",param_data->topic);
-	mqtt_send(res,tmp_topic);//返回数据 返回的数据会在原有的topic后加一个/response
+	mqtt_send(res,tmp_topic);
 	
+	
+	
+	//清除malloc分配的内存
     if(data!=NULL){
 		paramFree(data);
 	}
@@ -166,13 +176,13 @@ void onSend(void *context, MQTTAsync_successData *response) {//信息已经被�
     printf("Message with token value %d delivery confirmed\n", response->token);
 }
 
-int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {//有信息到达 时候运行，异步mqtt是可以多线程运行的
+int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *message) {//有信息到达时运行，异步mqtt是可以多线程运行的
     
 	if(strstr(topicName,"/response")){//过滤掉自己的回复
 		MQTTAsync_freeMessage(&message);
 		return 1;
 	}
-	printf("Message arrived\n");
+	// printf("Message arrived\n");
     printf("     topic: %s\n", topicName);
     printf("   message: %.*s\n", message->payloadlen, (char*)message->payload);
 	
@@ -180,23 +190,32 @@ int msgarrvd(void *context, char *topicName, int topicLen, MQTTAsync_message *me
 	//return 1;
 	
 	thParam *data = (thParam*)malloc(sizeof(thParam));
-	char *topic = malloc(sizeof(char)*(strlen(topicName)+1));
-	char *jsonStr = malloc(sizeof(char)*(message->payloadlen+1));
-	strcpy(topic,topicName);
-	strcpy(jsonStr,(char*)message->payload);
 	
 	data->len = message->payloadlen;
-	data->topic = topic;
-	data->jsonStr = jsonStr;
 	
-
+	data->topic = malloc(sizeof(char)*(strlen(topicName)+2));
+	memset(data->topic,strlen(topicName)+2,0);
+	strcpy(data->topic,topicName);
+	
+	if(message->payloadlen == 0){
+		data->jsonStr = NULL;
+	}else{
+		data->jsonStr = malloc(sizeof(char)*(message->payloadlen+2));
+		memset(data->jsonStr,message->payloadlen+2,0);
+		strcpy(data->jsonStr,(char*)message->payload);
+	}
+	
+	//线程结束后不会自动释放占用的资源要使用pthread_detach 或 pthread_join来释放
 	pthread_t thread;
 	if (pthread_create(&thread, NULL, deal, (void*)data) != 0) {
         printf("Failed to create thread, topic %s\n",topicName);
-    }
-	
+    }else{
+		//让线程结束后自动释放
+		pthread_detach(thread);
+	}
+	// printf("msgarrvd over\n");
 	MQTTAsync_freeMessage(&message);
-	return 1;////这里必须返回1，来告诉mqtt服务器接收成功，服务器会一直发消息
+	return 1;//这里必须返回1，来告诉mqtt服务器接收成功，服务器会一直发消息
 }
 
 void onConnectFailure(void *context, MQTTAsync_failureData *response) {//连接失败
@@ -247,6 +266,8 @@ void onConnect(void *context, MQTTAsync_successData *response) {//连接成功�
 void onDisconnect(void *context, MQTTAsync_successData *response) {//手动断开连接
     printf("Disconnected\n");
 }
+
+
 
 int mqtt_send(char* str,char *topic){
 	int rc;
@@ -354,14 +375,13 @@ MQTTAsync_connectOptions setMqttOps(int aliveInterval,int cleanFlag,char* usr,ch
 	MQTTAsync_connectOptions conn_opts = MQTTAsync_connectOptions_initializer;
 	conn_opts.keepAliveInterval = aliveInterval;
     conn_opts.cleansession = cleanFlag;
-    //conn_opts.username = usr;  // 设置用户名
-    //conn_opts.password = pw;  // 设置密码
-	
+	if(usr != NULL && pw != NULL){
+		conn_opts.username = usr;  // 设置用户名
+		conn_opts.password = pw;  // 设置密码
+	}
 	conn_opts.onSuccess = onConnect;
 	conn_opts.onFailure = onConnectFailure;
 	conn_opts.context = client;
-
-	
 	return conn_opts;
 }
 
@@ -377,7 +397,8 @@ void* mqtt_main(void *func){
 
 	int rc;
 	//client是全局变量
-	MQTTAsync_connectOptions conn_opts = setMqttOps(20,0,"lcm","sa");
+	//MQTTAsync_connectOptions conn_opts = setMqttOps(20,0,"lcm","sa");
+	MQTTAsync_connectOptions conn_opts = setMqttOps(20,0,NULL,NULL);
 	//遗嘱消息
 	MQTTAsync_willOptions will_opts = MQTTAsync_willOptions_initializer;
     will_opts.message = "test exit";

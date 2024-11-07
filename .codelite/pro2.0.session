@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Session Name="/home/lcm/Desktop/workspace/router/pro2.0/pro2.0.workspace">
+  <int Value="9" Name="m_selectedTab"/>
+  <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/pro2.0.workspace" Name="m_workspaceName"/>
+  <TabInfoArray Name="TabInfoArray">
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/plc/plcctl.c" Name="FileName"/>
+      <int Value="1023" Name="FirstVisibleLine"/>
+      <int Value="1044" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/plc/plcctl.h" Name="FileName"/>
+      <int Value="154" Name="FirstVisibleLine"/>
+      <int Value="156" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/database/sqlite.c" Name="FileName"/>
+      <int Value="3" Name="FirstVisibleLine"/>
+      <int Value="4" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/database/sqlite.h" Name="FileName"/>
+      <int Value="13" Name="FirstVisibleLine"/>
+      <int Value="15" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/plc/plcsqlite.c" Name="FileName"/>
+      <int Value="45" Name="FirstVisibleLine"/>
+      <int Value="47" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/plc/plcsqlite.h" Name="FileName"/>
+      <int Value="11" Name="FirstVisibleLine"/>
+      <int Value="13" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/mqtt.c" Name="FileName"/>
+      <int Value="428" Name="FirstVisibleLine"/>
+      <int Value="430" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/mqtt.h" Name="FileName"/>
+      <int Value="0" Name="FirstVisibleLine"/>
+      <int Value="0" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/tojson.c" Name="FileName"/>
+      <int Value="165" Name="FirstVisibleLine"/>
+      <int Value="167" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+    <TabInfo>
+      <wxString Value="/home/lcm/Desktop/workspace/router/pro2.0/net/firewall.c" Name="FileName"/>
+      <int Value="58" Name="FirstVisibleLine"/>
+      <int Value="60" Name="CurrentLine"/>
+      <wxArrayString Name="Bookmarks"/>
+      <IntVector Name="CollapsedFolds"/>
+    </TabInfo>
+  </TabInfoArray>
+  <SerializedObject Name="m_breakpoints">
+    <long Value="0" Name="Count"/>
+  </SerializedObject>
+  <wxString Value="*.c;*.cpp;*.cxx;*.cc;*.h;*.hpp;*.inc;*.mm;*.m;*.xrc;*.plist;*.txt" Name="m_findInFilesMask"/>
+</Session>

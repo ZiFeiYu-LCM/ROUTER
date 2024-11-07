@@ -1,6 +1,7 @@
 #include "plcctl.h"
 #include <snap7.h>
 #include "../mqtt.h"
+struct mysqlStruct* routerBase = NULL;
 char pollDevlist_stopFlag = 0;
 char plcFlag = 0; 
 char timerStopFlag = 1;//定时器关闭 
@@ -20,7 +21,7 @@ int writeValue32f(S7Object *client,int offset,void *data);
 /************************************************************************************************
 				                     plcctl调用的函数
 ************************************************************************************************/
-void *getMpinfoList_update(char *jsonStr){
+void *getMpinfoList_update(char *jsonStr){//更新本地链表中的一个或者多个节点信息
 	paraData* data = NULL;
 	int tmpNum = jsonToParam(jsonStr,&data);
 	if(tmpNum <= 0){
@@ -31,73 +32,16 @@ void *getMpinfoList_update(char *jsonStr){
 	
 	for(int i=0;i<tmpNum;i++){
 		
-		struct pollNode* orgNode = selectNodefromList(pollList,&updateArray[i]);
-		pollinfo* orgNodeinfo = (pollinfo*)malloc(sizeof(pollinfo));
-		memcpy(orgNodeinfo,orgNode->node,sizeof(pollinfo));
-		
 		struct pollNode *tmpNode = pollListUpdate(pollList,&updateArray[i]);		
-		//////////		
-		printf("=====更新节点前的遍历   getMpinfoList_update\n");
-		struct pollNode* tmpNode1 = tmpNode;
-		printf("%s_%s:	timer1:%ld  timer2:%ld  uploadTimer:%ld\n",tmpNode1->node->devname,tmpNode1->node->mpname,
-		tmpNode1->node->timer.readTimer1,tmpNode1->node->timer.readTimer2,tmpNode1->node->timer.uploadTimer);
-		//////////
-		pthread_mutex_lock(&(tmpNode->mutex));
-
-
-		//重新设置定时器时间
-		if(tmpNode->node->pollcycle != orgNodeinfo->pollcycle){
-			tmpNode->node->timer.its1.it_value.tv_sec = tmpNode->node->pollcycle;
-			tmpNode->node->timer.its1.it_interval.tv_sec = tmpNode->node->pollcycle;
-			if(!timerStopFlag){
-				if ((tmpNode->node->timer.its1.it_value.tv_sec==0 && tmpNode->node->timer.its1.it_interval.tv_sec==0) || (timer_settime(tmpNode->node->timer.readTimer1, 0, &tmpNode->node->timer.its1, NULL)==-1)) {//重新设置定时器的出发时间
-					char tmpstr[200];
-					snprintf(tmpstr,200,"%s_%s failed to start readTimer1",tmpNode->node->devname,tmpNode->node->mpname);
-					LOG_ERROR(tmpstr);
-				}
-			}
-		}
-		
-		if(tmpNode->node->pollcycle2 != orgNodeinfo->pollcycle2){
-			tmpNode->node->timer.its2.it_value.tv_sec = tmpNode->node->pollcycle2;
-			tmpNode->node->timer.its2.it_interval.tv_sec = tmpNode->node->pollcycle2;
-			if(!timerStopFlag && tmpNode->node->ismultipoll){
-				if ((tmpNode->node->timer.its2.it_value.tv_sec==0 && tmpNode->node->timer.its2.it_interval.tv_sec==0) || (timer_settime(tmpNode->node->timer.readTimer2, 0, &tmpNode->node->timer.its2, NULL)==-1)) {//重新设置定时器的出发时间
-					char tmpstr[200];
-					snprintf(tmpstr,200,"%s_%s failed to start readTimer2",tmpNode->node->devname,tmpNode->node->mpname);
-					LOG_ERROR(tmpstr);
-				}
-			}
-		}
-		
-		if(tmpNode->node->uploadperiod != orgNodeinfo->uploadperiod){
-			tmpNode->node->timer.uploadIts.it_value.tv_sec = tmpNode->node->uploadperiod;
-			tmpNode->node->timer.uploadIts.it_interval.tv_sec = tmpNode->node->uploadperiod;
-			if(!timerStopFlag){
-				if ((tmpNode->node->timer.uploadIts.it_value.tv_sec==0 && tmpNode->node->timer.uploadIts.it_interval.tv_sec==0) || (timer_settime(tmpNode->node->timer.uploadTimer, 0, &tmpNode->node->timer.uploadIts, NULL)==-1)) {//重新设置定时器的出发时间
-					char tmpstr[200];
-					snprintf(tmpstr,200,"%s_%s failed to start readTimer1",tmpNode->node->devname,tmpNode->node->mpname);
-					LOG_ERROR(tmpstr);
-				}	
-			}
-		}
-		
-		//////////		
-		printf("=====更新节点中的遍历   getMpinfoList_update\n");
-		tmpNode1 = tmpNode;
-		printf("%s_%s:	timer1:%ld  timer2:%ld  uploadTimer:%ld\n",tmpNode1->node->devname,tmpNode1->node->mpname,
-		tmpNode1->node->timer.readTimer1,tmpNode1->node->timer.readTimer2,tmpNode1->node->timer.uploadTimer);
-		//////////
-
-		pthread_mutex_unlock(&(tmpNode->mutex));
-		if(orgNodeinfo!=NULL)
-			free(orgNodeinfo);
 	}
+	
+	
 	if(updateArray!=NULL)
 		free(updateArray);
+	paramFree(data);
 	return NULL;
 }
-void *getMpinfoList_delete(char *jsonStr){//删除本地的某个节点信息
+void *getMpinfoList_delete(char *jsonStr){//删除本地的一个或多个节点信息
 	paraData* data = NULL;
 	int tmpNum = jsonToParam(jsonStr,&data);
 	if(tmpNum <= 0){
@@ -109,7 +53,7 @@ void *getMpinfoList_delete(char *jsonStr){//删除本地的某个节点信息
 		struct pollNode* tmpNode = selectNodefromList(pollList, &delArray[i]);
 		pthread_mutex_lock(&(tmpNode->mutex));
 		
-		//销毁定时器
+		//销毁定时器1
 		if (timer_delete(tmpNode->node->timer.readTimer1) == -1) {
 			char tmpstr[200];
 			snprintf(tmpstr,200,"%s_%s failed to stop readTimer1",tmpNode->node->devname,tmpNode->node->mpname);
@@ -117,7 +61,7 @@ void *getMpinfoList_delete(char *jsonStr){//删除本地的某个节点信息
 		}else{
 			printf("已删除%s定时器readTimer1:  timerid:%ld\n",tmpNode->node->mpname,tmpNode->node->timer.readTimer1);
 		}
-
+		//销毁定时器2
 		if (timer_delete(tmpNode->node->timer.readTimer2) == -1) {
 			char tmpstr[200];
 			snprintf(tmpstr,200,"%s_%s failed to stop readTimer2",tmpNode->node->devname,tmpNode->node->mpname);
@@ -125,7 +69,7 @@ void *getMpinfoList_delete(char *jsonStr){//删除本地的某个节点信息
 		}else{
 			printf("已删除%s定时器readTimer2   timerid:%ld\n",tmpNode->node->mpname,tmpNode->node->timer.readTimer2);
 		}
-		
+		//销毁上传定时器
 		if (timer_delete(tmpNode->node->timer.uploadTimer) == -1) {
 			char tmpstr[200];
 			snprintf(tmpstr,200,"%s_%s failed to stop uploadTimer",tmpNode->node->devname,tmpNode->node->mpname);
@@ -135,29 +79,25 @@ void *getMpinfoList_delete(char *jsonStr){//删除本地的某个节点信息
 		}
 		
 		
-		//删除节点时，删除对应的文件
-		char *logFile = malloc(sizeof(LOGPATH)+sizeof(tmpNode->node->devname)+sizeof(tmpNode->node->mpname)+7);
-		sprintf(logFile,"%s%s_%s.log",LOGPATH,tmpNode->node->devname,tmpNode->node->mpname);
-		//	char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devid)+sizeof(info->mpid)+7);//以id为路径
-		//	sprintf(logFile,"%s%d_%d.log",LOGPATH,info->devid,info->mpid);
-		if (access(logFile, F_OK) == 0) {//若文件存在
-			FILE *fp;
-			char cmd[1024];
-			snprintf(cmd,1024,"rm %s",logFile);
-			fp = popen(cmd,"r");
-		    if (fp == NULL) {
-				LOG_ERROR("popen failed");
-			}else{
-				char cmdRes[1024];
-				while(fgets(cmdRes,1024,fp)!=NULL){
-					printf(cmdRes);
-				}
-				if (pclose(fp) == -1) {
-					LOG_ERROR("pclose failed");
-				}
+		//删除节点时，删除对应的表, 我们使用
+		//_devid_mpid
+		//我们使用上面的字段作为表名
+		char *tableName = malloc(sizeof(char) * 30);
+		sprintf(tableName,"_%d_%d",tmpNode->node->devid,tmpNode->node->mpid);
+		
+		//删除表
+		if(routerBase == NULL){
+			if(con_routerbase() == NULL){
+				return "error:routerBase is NULL \n";
 			}
 		}
-		free(logFile);
+		if(!deleteTable(routerBase, tableName)){
+				printf("删除表: %s  失败\n",tableName);
+				return "error:delete database table failed \n";
+		}
+
+
+		free(tableName);
 		
 		pthread_mutex_unlock(&(tmpNode->mutex));
 		pollListDel(pollList, &delArray[i]);
@@ -165,13 +105,17 @@ void *getMpinfoList_delete(char *jsonStr){//删除本地的某个节点信息
 	
 	if(delArray!=NULL)
 		free(delArray);
+	if(data->msg!=NULL)
+		free(data->msg);
+	if(data!=NULL)
+		free(data);
 	
 	printf("删除已运行完毕\n");
 	listIterator(pollList);
 	
 	return NULL;
 }
-void *getMpinfoList_add(char *jsonStr){
+void *getMpinfoList_add(char *jsonStr){//向链表中添加一个或多个节点信息，并配置定时器，然后启动定时器
 	paraData* data = NULL;
 	int tmpNum = jsonToParam(jsonStr,&data);
 	if(tmpNum <= 0){
@@ -187,42 +131,40 @@ void *getMpinfoList_add(char *jsonStr){
 		
 		if(!timerStopFlag){//是否开启定时器
 			//printf("正在启动定时器...\n");
+			//启动定时器1
 			if ((nodeinfo->timer.its1.it_value.tv_sec==0 && nodeinfo->timer.its1.it_interval.tv_sec==0) || (timer_settime(nodeinfo->timer.readTimer1, 0, &nodeinfo->timer.its1, NULL) == -1)) {
 				char tmpstr[200];
 				snprintf(tmpstr,200,"%s_%s failed to start readTimer1",nodeinfo->devname,nodeinfo->mpname);
 				LOG_ERROR(tmpstr);
 			}else{
-				printf("%s_%s:	timer1:%ld\n",tmpNode->node->devname,tmpNode->node->mpname,
-		tmpNode->node->timer.readTimer1);
+				printf("%s_%s:	timer1:%ld\n",tmpNode->node->devname,tmpNode->node->mpname,tmpNode->node->timer.readTimer1);
 			}
-		
+			//启动定时器2
 			if(nodeinfo->ismultipoll){
 				if ((nodeinfo->timer.its2.it_value.tv_sec==0 && nodeinfo->timer.its2.it_interval.tv_sec==0) || (timer_settime(nodeinfo->timer.readTimer2, 0, &nodeinfo->timer.its2, NULL) == -1)) {
 					char tmpstr[200];
 					snprintf(tmpstr,200,"%s_%s failed to start readTimer2",nodeinfo->devname,nodeinfo->mpname);
 					LOG_ERROR(tmpstr);
 				}else{
-				printf("%s_%s:	timer2:%ld\n",tmpNode->node->devname,tmpNode->node->mpname,
-		tmpNode->node->timer.readTimer2);
-			}		
+					printf("%s_%s:	timer2:%ld\n",tmpNode->node->devname,tmpNode->node->mpname,tmpNode->node->timer.readTimer2);
+				}		
 			}
-		
+			//启动上传定时器
 			if ((nodeinfo->timer.uploadIts.it_value.tv_sec==0 && nodeinfo->timer.uploadIts.it_interval.tv_sec==0) || (timer_settime(nodeinfo->timer.uploadTimer, 0, &nodeinfo->timer.uploadIts, NULL) == -1)) {
 					char tmpstr[200];
 					snprintf(tmpstr,200,"%s_%s failed to start uploadTimer",nodeinfo->devname,nodeinfo->mpname);
 					LOG_ERROR(tmpstr);
 			}else{
-				printf("%s_%s:	uploadTimer:%ld\n",tmpNode->node->devname,tmpNode->node->mpname,
-		tmpNode->node->timer.uploadTimer);
+				printf("%s_%s:	uploadTimer:%ld\n",tmpNode->node->devname,tmpNode->node->mpname,tmpNode->node->timer.uploadTimer);
 			}
 		}
 	}
 	
-	listIterator(pollList);
 	
+	listIterator(pollList);
 	return NULL;
 }
-void *getMpinfoList(char *jsonStr){
+void *getMpinfoList(char *jsonStr){ //获取到所有的节点信息，并将这些信息初始化都pollList链表中
 	paraData* data = NULL;
 	int tmpNum = jsonToParam(jsonStr,&data);
 	if(tmpNum < 0){
@@ -276,7 +218,7 @@ void *getMpinfoList(char *jsonStr){
 	printf("getMpinfoList over!\n");
 	return NULL;
 }
-void *freeMpinfoArray(char *arg){
+void *freeMpinfoArray(char *arg){//释放pollInfoArray
 //	timerStopFlag = 1;
 
 	if(pollInfoArraySize>0){
@@ -287,7 +229,7 @@ void *freeMpinfoArray(char *arg){
 	printf("pollInfoArray successful\n");
 	return NULL;
 }
-int timerOpsSet(struct pollNode* node){
+int  timerOpsSet(struct pollNode* node){//用来配置定时器信息
 	pollinfo* nodeinfo = node->node;
 	//配置定时器1
 	nodeinfo->timer.sev1.sigev_notify = SIGEV_THREAD;
@@ -343,7 +285,8 @@ int timerOpsSet(struct pollNode* node){
 
 
 //从存值的日志文件中读取最后一行返回给web前端
-char *putMpinfoList(char *jsonStr){//后端会先赛选出符合条件的测点数据，这里按数据直接查即可
+//后端会先赛选出符合条件的测点数据，这里按数据直接查即可
+char *putMpinfoList(char *jsonStr){
 	char *topic = "plc/putmpinfo";
 	paraData* data = NULL;
 	int listSize = jsonToParam(jsonStr,&data);
@@ -357,19 +300,26 @@ char *putMpinfoList(char *jsonStr){//后端会先赛选出符合条件的测点�
 	int resSize = 0;
 	for(int i=0;i<listSize;i++){
 		readMpinfo *info = &infolist[i];
+
 		printf("info[%d]   %s  \n",i,info->devname);
-		char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devname)+sizeof(info->mpname)+7);
-		sprintf(logFile,"%s%s_%s.log",LOGPATH,info->devname,info->mpname);
-//		char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devid)+sizeof(info->mpid)+7);//--------------用id当做路径
-//		sprintf(logFile,"%s%d_%d.log",LOGPATH,info->devid,info->mpid);
-		if (access(logFile, F_OK) == -1) {
-			continue;
+		
+		char *tableName = malloc(sizeof(char) * 30);
+		sprintf(tableName,"_%d_%d",info->devid,info->mpid);
+		
+		//如果routerBase为NULL则重新连接，若重新连接失败则返回error
+		if(routerBase == NULL){
+			if(con_routerbase() == NULL){
+				return "error:routerBase is NULL";
+			}
 		}
-		char lastLine[1024];
-		getLastLine(logFile,lastLine);//将文件中最后一行存入lastline；
-		char *valueStr = strtok(lastLine,"#");//获取lastline的value部分
-		char *timeStr = strtok(NULL,"#");//获取lastline的time部分
-		free(logFile);
+		//从数据库里面返回tableName，最近的值 以及 时间
+		char **resArray;
+		int resArraySize = select_last_data(routerBase,resArray,tableName);
+		if(resArraySize < 0){
+			return "error:select_last_data failed";
+		}
+		
+		free(tableName);
 		
 		mpinfoList[resSize].devid = info->devid;
 		mpinfoList[resSize].mpid = info->mpid;
@@ -380,9 +330,11 @@ char *putMpinfoList(char *jsonStr){//后端会先赛选出符合条件的测点�
 		strcpy(mpinfoList[resSize].address,info->address);
 		strcpy(mpinfoList[resSize].mpnote,info->mpnote);
 		strcpy(mpinfoList[resSize].ip,info->ip);
-		strcpy(mpinfoList[resSize].value,valueStr);
-		strcpy(mpinfoList[resSize].time,timeStr);
+		strcpy(mpinfoList[resSize].value,resArray[0]);
+		strcpy(mpinfoList[resSize].time,resArray[1]);
 		resSize++;
+		
+		freeValArray(resArray,resArraySize);
 	}
 	
 	paramFree(data);
@@ -397,73 +349,92 @@ char *putMpinfoList(char *jsonStr){//后端会先赛选出符合条件的测点�
 }
 
 //存储
-void saveData(void *data,pollinfo *info){//存储
-	char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devname)+sizeof(info->mpname)+7);
-	sprintf(logFile,"%s%s_%s.log",LOGPATH,info->devname,info->mpname,info->warnname);
+void saveData(void *data,pollinfo *info){
 	
-//	char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devid)+sizeof(info->mpid)+7);//以id为路径
-//	sprintf(logFile,"%s%d_%d.log",LOGPATH,info->devid,info->mpid);
-	printf("logFile : %s\n",logFile);
-	if (access(logFile, F_OK) == -1) {
-        // log文件不存在
-		FILE *file = fopen(logFile, "w");
-		if (file == NULL) {
-			perror("Failed to create file");
+	char tableName[30];
+	sprintf(tableName,"_%d_%d",info->devid,info->mpid);
+	
+	if(routerBase == NULL){
+		if(con_routerbase() == NULL){
+			perror("Failed to connect database");
 			return;
 		}
-		// 关闭文件
-		fclose(file);
-    }
-	time_t now = time(NULL);
-    // 格式化时间为字符串
-    char timebuf[80];
-    strftime(timebuf, sizeof(timebuf), "%Y-%m-%d %H:%M:%S", localtime(&now));
-	char command[100];
+	}
+	
+	int res = isIn_tableNames(routerBase, DATABASE,tableName);
+	
+	printf("===1\n");
+	if(res < 0){//查询表名错误
+		perror("Failed to select table names");
+		return;	
+	}else if(res == 0){//没有对应的表
+		printf("===1.1\n");
+		//createTable运行正常返回0
+		if(createTable(routerBase, tableName)){
+			fprintf(stderr,"Failed to create table %s", tableName);
+			return;		
+		}
+	}
+	printf("===2\n");
+	char sql[101];
 	switch(info->valuetype){
 		case 1:{
 				uint8_t *value = (uint8_t*)data;
-				snprintf(command, sizeof(command), "echo \"%d #%s\" >> %s", *value,timebuf,logFile);
+				snprintf(sql, 100, "INSERT INTO %s (value) VALUES ('%d');",tableName, *value);
 			}
 			break;
 		case 2:{
 				uint16_t *value = (uint16_t*)data;
-				snprintf(command, sizeof(command), "echo \"%d #%s\" >> %s", *value,timebuf,logFile);
+				snprintf(sql, 100, "INSERT INTO %s (value) VALUES ('%d');",tableName, *value);
 			}
 			break;
 		case 3:{
 				uint32_t *value = (uint32_t*)data;
-				snprintf(command, sizeof(command), "echo \"%d #%s\" >> %s", *value,timebuf,logFile);
+				snprintf(sql, 100, "INSERT INTO %s (value) VALUES ('%d');",tableName, *value);
 			}
 			break;
 		case 4:{
 				float *value = (float*)data;
-				snprintf(command, sizeof(command), "echo \"%f #%s\" >> %s", *value,timebuf,logFile);
+				snprintf(sql, 100, "INSERT INTO %s (value) VALUES ('%f');",tableName, *value);
 			}
 			break;		
 	}
-	int res = system(command);
-    if (res == -1) {
-        perror("system echo failed to write");
-        return;
-    }
-	//查看是否超出最大条目数，超出的话上传文件
-	FILE *file = fopen(logFile,"r");
-	int count = 0;
-	char line[200];
-	if(file == NULL){
-		printf("failed to fopen %s to read!",logFile);
-		return;
+	printf("123123\n");
+	if(routerBase->execMysql(routerBase,sql,NULL)){
+			fprintf(stderr,"Failed to insert to table %s", tableName);
+			return;	
 	}
-	while(fgets(line,200,file)!=NULL){
-		count++;
+	
+	
+	//查看是否超出最大条数
+	struct mysql_res_struct resdata = {NULL,0};
+	char **resArray = NULL;
+	snprintf(sql, 100, "SELECT COUNT(*) FROM %s;",tableName);
+	if(routerBase->execMysql(routerBase,sql,&resdata)){
+			fprintf(stderr,"Failed to excute sql %s", sql);
+			return;	
 	}
-	fclose(file);
-	if(count >= info->maxitem){
+	
+	int resArraySize = mysql_res_to_valArry(&resdata, &resArray, 0);
+	if(resArraySize < 0){
+			perror("mysql_res_to_valArry");
+			return;	
+	}
+	
+	int dataSize = atoi(resArray[0]);//tableName表中的数据条数
+	
+	
+	routerBase->freeRes(&resdata);
+	freeValArray(resArray,resArraySize);
+
+	
+	//如果超出最大限制，则上传文件
+	if(dataSize >= info->maxitem){
 		//上传文件
 		printf("uploadlog  maxitems \n");
-		uploadLog(logFile);
+		uploadLog(tableName);
 	}
-	free(logFile);
+	
 }
 
 //1==  2!=  3>  4>=  5<  6<=
@@ -599,7 +570,7 @@ void timer_handler(union sigval sv) {
 	}
 	if(iswarn){
 		printf("%s_%s_%s WARN!\n",info->devname,info->mpname,info->warnname);
-		/*===========================================================================================================报警操作*/
+		/*============================================================================================================================================报警操作*/
 	}
 	pthread_mutex_unlock(&(tmpNode->mutex));
 //	printf("                     --%s 解锁\n",info->mpname);
@@ -614,7 +585,7 @@ int _pollmp(void* arg) {
 	printf("xxxxxxxxxxxx         _pollmp：\n");
 	listIterator(pollList);
 	printf("\n");
-//
+
 //	printf("开启定时器遍历：\n");
 //	struct pollNode* tmpNode1 = pollList->head;
 //	while(tmpNode1!=NULL){
@@ -624,8 +595,7 @@ int _pollmp(void* arg) {
 //		tmpNode1 = tmpNode1->next;
 //	}
 
-
-
+	printf("start pollmp\n");
 	struct pollNode *tmpNode = pollList->head;
     //开启定时器
 	while(tmpNode!=NULL){
@@ -710,19 +680,19 @@ void *pollmp(void* arg){
 	}
 	timerStopFlag = 0;
 	pthread_t thread;
-	int result = pthread_create(&thread, NULL, _pollmp, arg);
-	if (result != 0) {
+	if (pthread_create(&thread, NULL, _pollmp, arg) != 0) {
 		printf("createPollpth: Error creating thread.\n");
 		return -1;
+	}else{
+		pthread_detach(thread);	
 	}
 }
 
+
 void *pollStop(void *arg){
-//	printf("\nxxxxxxxxxxxx          pollStop：\n");
-//	listIterator(pollList);
-//	printf("\n");
-	
 	timerStopFlag = 1;
+	if(routerBase)
+		close_routerbase(routerBase);//断开与本地的数据库连接
 	printf("The plc service has been stopped\n");
 	return NULL;
 }
@@ -778,9 +748,8 @@ int connectPLC(void *p,S7Object *client,char wrFlag){
 	if(res!=0){
 		printf("Cli_ConnectTo error\n");	
 		res = -1;	
-	}else
-		;
-//		printf("Cli_ConnectTo success!\n");
+	}
+//	printf("Cli_ConnectTo success!\n");
 	return res;
 }
 
@@ -903,7 +872,7 @@ int writeValue32f(S7Object *client,int offset,void *data){
 }
 
 
-//传入json字符串
+//传入json字符串, 向plc中写入数据
 void* writeData (void *jsonStr){
 	char *topic = "plc/putmpinfo";
 	paraData* data = NULL;
@@ -965,7 +934,8 @@ float uint32toFloat(uint32_t binary){
 	Float32 data;
 	data.i=binary;
 	return data.f;
-}uint32_t floattoUint32(float datafloat){
+}
+uint32_t floattoUint32(float datafloat){
 	Float32 data;
 	data.f=datafloat;
 	return data.i;
@@ -1048,37 +1018,39 @@ void getLastLine(char *filename,char str[]){
 
 //上传功能定时函数
 void timer_uploadLog(union sigval sv){
+	
 	struct pollNode* tmpNode = (struct pollNode *)sv.sival_ptr;
 	pollinfo *info = tmpNode->node;
 	
 	pthread_mutex_lock(&(tmpNode->mutex));
+
+	char tableName[30];
+	sprintf(tableName,"_%d_%d",tmpNode->node->devid,tmpNode->node->mpid);
 	
-	char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devname)+sizeof(info->mpname)+7);//以名字命名
-	sprintf(logFile,"%s%s_%s.log",LOGPATH,info->devname,info->mpname);
-	
-//	char *logFile = malloc(sizeof(LOGPATH)+sizeof(info->devid)+sizeof(info->mpid)+7);//============================以id好命名
-//	sprintf(logFile,"%s%d_%d.log",LOGPATH,info->devid,info->mpid);
-	
-//	printf("upload timer\n");
-	uploadLog(logFile);	
-	free(logFile);
-	
+	uploadLog(tableName);	
+
 	pthread_mutex_unlock(&(tmpNode->mutex));
 }
 
 //执行上传功能
 int uploadLog(char *filePath){
-//	printf("========================upload %s ...\n",filePath);
+	
+//-------------------------------------------------------------------------------------------------------------------------这里有个上传的功能
+/*
 	if(mqtt_send_file(filePath,NULL) != 0){
 		printf("failed to upload file\n");
 		return -1;
 	}
-	
+*/
+	printf("================================upload file %s==================================\n",filePath);
 	//上传之后清除对应的文件
-	char command[200];
-	snprintf(command,200,"rm %s",filePath);
-	system(command);
-	printf("========================upload %s finished \n",filePath);
+	if(routerBase == NULL){
+		if(!con_routerbase){
+			return -1;
+		}
+	}
+		
+	delete_all_data(routerBase, filePath);
     return 0;
 }
 
@@ -1104,8 +1076,10 @@ void listIterator(struct pollInfoList* pollList){
 	pthread_mutex_unlock(&pollList->mutex);
 	printf("pollList->listSize: %d\n",pollList->listSize);
 	pthread_mutex_unlock(&pollList->mutex);
+	printf("  listIterator over \n");
 }
 
+//把pollinfo封装为pollNode
 struct pollNode* pollNodeInit(pollinfo* nodeInfo){
 	struct pollNode* tmp = (struct pollNode*)malloc(sizeof(struct pollNode));
 	tmp->next=NULL;
@@ -1124,6 +1098,7 @@ struct pollInfoList* pollListInit(){
 	return tmp;
 }
 
+//将节点添加到链表尾部，并返回链表尾节点
 struct pollNode* pollListAdd(struct pollInfoList* pollList,pollinfo* nodeInfo){//返回总节点数
 	struct pollNode* tmpNode = pollNodeInit(nodeInfo);
 	pthread_mutex_lock(&pollList->mutex);
@@ -1146,7 +1121,7 @@ struct pollNode* pollListAdd(struct pollInfoList* pollList,pollinfo* nodeInfo){/
 
 	return pollList->rear;
 }
-
+//删除链表中的节点
 struct pollNode* pollListDel(struct pollInfoList* pollList,pollinfo* nodeInfo){//返回总节点数
 	if(nodeInfo == NULL || pollList->listSize<=0){
 		return -1;
@@ -1204,7 +1179,7 @@ struct pollNode* pollListDel(struct pollInfoList* pollList,pollinfo* nodeInfo){/
 	pthread_mutex_unlock(&pollList->mutex);
 	return pollList->head; 
 }
-
+//更新链表节点，但是不更新该节点定时器信息，因为更新定时器信息可能导致无法操作已启动的定时器
 struct pollNode* pollListUpdate(struct pollInfoList* pollList,pollinfo* nodeInfo){//返回更新节点的pollNode指针
 	if(nodeInfo == NULL || pollList->listSize<=0){
 		return -1;
@@ -1225,11 +1200,58 @@ struct pollNode* pollListUpdate(struct pollInfoList* pollList,pollinfo* nodeInfo
 			
 			
 			////////////////////
+			//保存原有数据的内容用来比较定时器时间是否修改
+			pollinfo *orgNodeinfo = (pollinfo*)malloc(sizeof(pollinfo));
+			if(orgNodeinfo == NULL){
+				return NULL;
+			}
+			memcpy(orgNodeinfo,tmpNode->node,sizeof(pollinfo));
+			
+			
 			mpTimer timer = tmpNode->node->timer;
 			memcpy(tmpNode->node,nodeInfo,sizeof(pollinfo));
 			tmpNode->node->timer = timer;
 			
 			
+			//重新设置定时器时间，注意这里不需要将定时器停止再设置
+			if(tmpNode->node->pollcycle != orgNodeinfo->pollcycle){
+				tmpNode->node->timer.its1.it_value.tv_sec = tmpNode->node->pollcycle;
+				tmpNode->node->timer.its1.it_interval.tv_sec = tmpNode->node->pollcycle;
+				if(!timerStopFlag){
+					if ((tmpNode->node->timer.its1.it_value.tv_sec==0 && tmpNode->node->timer.its1.it_interval.tv_sec==0) || ((tmpNode->node->timer.readTimer1, 0, &tmpNode->node->timer.its1, NULL)==-1)) {//重新设置定时器的出发时间
+						char tmpstr[200];
+						snprintf(tmpstr,200,"%s_%s failed to start readTimer1",tmpNode->node->devname,tmpNode->node->mpname);
+						LOG_ERROR(tmpstr);
+					}
+				}
+			}
+			
+			if(tmpNode->node->pollcycle2 != orgNodeinfo->pollcycle2){
+				tmpNode->node->timer.its2.it_value.tv_sec = tmpNode->node->pollcycle2;
+				tmpNode->node->timer.its2.it_interval.tv_sec = tmpNode->node->pollcycle2;
+				if(!timerStopFlag && tmpNode->node->ismultipoll){
+					if ((tmpNode->node->timer.its2.it_value.tv_sec==0 && tmpNode->node->timer.its2.it_interval.tv_sec==0) || (timer_settime(tmpNode->node->timer.readTimer2, 0, &tmpNode->node->timer.its2, NULL)==-1)) {//重新设置定时器的出发时间
+						char tmpstr[200];
+						snprintf(tmpstr,200,"%s_%s failed to start readTimer2",tmpNode->node->devname,tmpNode->node->mpname);
+						LOG_ERROR(tmpstr);
+					}
+				}
+			}
+			
+			if(tmpNode->node->uploadperiod != orgNodeinfo->uploadperiod){
+				tmpNode->node->timer.uploadIts.it_value.tv_sec = tmpNode->node->uploadperiod;
+				tmpNode->node->timer.uploadIts.it_interval.tv_sec = tmpNode->node->uploadperiod;
+				if(!timerStopFlag){
+					if ((tmpNode->node->timer.uploadIts.it_value.tv_sec==0 && tmpNode->node->timer.uploadIts.it_interval.tv_sec==0) || (timer_settime(tmpNode->node->timer.uploadTimer, 0, &tmpNode->node->timer.uploadIts, NULL)==-1)) {//重新设置定时器的出发时间
+						char tmpstr[200];
+						snprintf(tmpstr,200,"%s_%s failed to start readTimer1",tmpNode->node->devname,tmpNode->node->mpname);
+						LOG_ERROR(tmpstr);
+					}	
+				}
+			}
+			
+			
+			free(orgNodeinfo);
 			////////////////////
 			
 //			printf("更新节点后的遍历    pollListUpdate\n");
@@ -1241,6 +1263,7 @@ struct pollNode* pollListUpdate(struct pollInfoList* pollList,pollinfo* nodeInfo
 			pthread_mutex_unlock(&tmpNode->mutex);
 			break;
 		}
+		
 		pthread_mutex_unlock(&tmpNode->mutex);
 		tmpNode = tmpNode->next;
 	}
@@ -1275,6 +1298,7 @@ int freeList(struct pollInfoList* list){//当list为空时，默认情况全局�
 	return 0; 
 }
 
+//这个是按照mpid  和  devid 进行查找的
 struct pollNode* selectNodefromList(struct pollInfoList* pollList,pollinfo* nodeInfo){
 	if(nodeInfo == NULL || pollList->listSize<=0){
 		return -1;
@@ -1290,6 +1314,48 @@ struct pollNode* selectNodefromList(struct pollInfoList* pollList,pollinfo* node
 		tmpNode = tmpNode->next;
 	}
 }
+
+
+//连接数据库
+struct mysqlStruct* con_routerbase(){
+
+	struct mysqlStruct* mysqldb = plcDatabase_init();
+	if(mysqldb == NULL){
+		fprintf(stderr,"create struct sqliteStruct failed!\n");
+		return NULL;
+	}
+	if(mysqldb->connectDb(mysqldb, DATABASE,IP)){
+		fprintf(stderr,"connect to database %s failed!\n",DATABASE);
+		return NULL;
+	}
+	routerBase = mysqldb;
+	return mysqldb;
+}
+//关闭并且释放数据库指针
+void close_routerbase(struct mysqlStruct* mysqldb){
+	plcDatabase_free(mysqldb,NULL);
+}
+
+
+
+//将plc信息存于网关上才能用到此函数，用来插叙数据库中所有信息
+struct mysql_res_struct select_from_database(struct mysqlStruct* mysqldb){
+	char *select_sql = "SELECT "
+		"pd.devid, pd.devname, pd.ip, pd.pollcycle, pd.ismultipoll, pd.pollcycle2, pd.istimeout, pd.collecttime, pd.connecttime, "
+		"dg.groupname, dg.uploadperiod, dg.maxitem, "
+		"pmp.mpid, pmp.mpname, pmp.addresstype, pmp.dbindex, pmp.address, pmp.valuetype, pmp.mpnote, "
+		"pw.warnname, pw.warnlevel, pw.wcvalue1, pw.wcvalue2, pw.warncontext "
+	"FROM plcdevices pd "
+	"LEFT JOIN devgroup dg ON pd.groupid = dg.groupid "
+	"LEFT JOIN plcmp pmp ON pd.devid = pmp.devid "
+	"LEFT JOIN plcwarn pw ON pmp.mpid = pw.mpid;"
+	"WHERE pd.status = 1;";
+	struct mysql_res_struct selectRes = {NULL,0};
+	mysqldb->execMysql(&mysqldb,select_sql,&selectRes);
+	return selectRes;
+}
+
+
 
 
 

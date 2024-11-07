@@ -4,17 +4,20 @@ CFLAGS=-Wall -O0 -shared -g
 #定义连接器的选项(-pthread -L/home/lcm/Desktop/libs  指定库文件的目录)
 #若定义了ARCH的话则指定库文件的路径，否则使用系统的库
 ifdef ARCH
-	LIBPATH := -L/home/lcm/Desktop/libs -L/home/lcm/Desktop/libs/exlibs -L/home/lcm/Desktop/libs/usr
+	LIBPATH := -L/home/lcm/linux/tina-d1-h/prebuilt/gcc/linux-x86/arm/toolchain-sunxi-glibc/toolchain/lib -L/home/lcm/Desktop/libs -L/home/lcm/Desktop/libs/exlibs -L/home/lcm/Desktop/libs/usr -L/home/lcm/Desktop/tmp -L/home/lcm/Desktop/libs/mysql/lib/mysql -L/home/lcm/Desktop/libs/mysql/lib/ncurses
+	#-L/home/lcm/Desktop/libs/sqlite/lib -I/home/lcm/Desktop/libs/sqlite/include 
 	#bin文件所在的目录
 	BIN_DIR := ./out/arm
-	CFLAGS += -I/home/lcm/Desktop/includes
+	CFLAGS += -I/home/lcm/Desktop/includes -I/home/lcm/Desktop/libs/mysql/include
 else
-	LIBPATH := -L/home/lcm/Desktop/第三方库/paho.mqtt.c-1.3.13/linux/lib
+	LIBPATH := -L/home/lcm/Desktop/第三方库/paho.mqtt.c-1.3.13/linux/lib -L/home/lcm/software/pc/mysql/lib/mysql
 	BIN_DIR := ./out/linux
-	CFLAGS += -I/home/lcm/Desktop/第三方库/paho.mqtt.c-1.3.13/linux/include
+	CFLAGS += -I/home/lcm/Desktop/第三方库/paho.mqtt.c-1.3.13/linux/include -I/home/lcm/software/pc/mysql/include
+	#-L/home/lcm/software/pc/sqlite/lib  -I/home/lcm/software/pc/sqlite/include
 endif
   
-LDFLAGS ?= $(LIBPATH) -lsnap7 -lssl -lcrypto -levent -levent_openssl -lpthread -lmicrohttpd -lz -lcurl -lcjson -lrt -lpaho-mqtt3a
+LDFLAGS ?= $(LIBPATH) -lc -lsnap7 -lssl -lcrypto -levent -levent_openssl -lpthread -lmicrohttpd -lz -lcurl -lcjson -lrt -lpaho-mqtt3a -lmysqlclient -lncurses
+#-lsqlite3
 #设置编译器
 CC=${CROSS_COMPILE}gcc
 #目标文件所在的目录

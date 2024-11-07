@@ -13,12 +13,14 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+
+#include "plcdatabase.h"
 #include "../tojson.h"
 #include "../common.h"
 
 #define LINE_LENGTH 1024
 
-
+//#define DATABASE "/home/lcm/Desktop/workspace/router.db"
 
 typedef struct _pthNode{
 	pthread_t id;
@@ -83,6 +85,21 @@ struct pollInfoList {
 #define rackNumber 0 //机架号
 #define slotNumber 1 //插槽号
 
+
+
+//数据库操作
+struct mysqlStruct* con_routerbase();
+void close_routerbase(struct mysqlStruct* mysqldb);
+struct mysql_res_struct select_from_database(struct mysqlStruct* mysqldb);
+
+
+
+
+
+
+
+
+
 //线程列表
 int traverseList(pthNode *pthHead,pthNode *pthCur);
 int listFree(pthNode *pthHead,pthNode *pthCur);
@@ -135,6 +152,10 @@ struct pollNode* selectNodefromList(struct pollInfoList* pollList,pollinfo* node
 pollinfo *pollInfoArray;
 int pollInfoArraySize;
 struct pollInfoList* pollList;
+
+//数据库
+extern struct mysqlStruct* routerBase;
+
 
 pthread_mutex_t connetctMutex;
 #endif
